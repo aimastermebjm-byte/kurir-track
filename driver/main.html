@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="KurirTrack - Driver Interface">
+    <meta name="theme-color" content="#22c55e">
+    <title>KurirTrack - Driver</title>
+    <link rel="manifest" href="../manifest.json">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/driver.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <div class="driver-header">
+            <div class="driver-profile">
+                <div class="driver-profile-avatar" id="driver-avatar">D</div>
+                <div class="driver-profile-info">
+                    <span class="driver-profile-name" id="driver-name">Driver</span>
+                    <span class="driver-profile-status" id="driver-status">Online</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="icon-btn" onclick="toggleSettings()" title="Settings">⚙️</button>
+                <button class="icon-btn" onclick="Auth.logout()" title="Logout">🚪</button>
+            </div>
+        </div>
+
+        <!-- Map -->
+        <div class="driver-map-wrapper">
+            <div class="map-container" id="driver-map"></div>
+
+            <!-- Speed overlay -->
+            <div class="speed-overlay" id="speed-overlay">
+                <div class="speed-now speed-safe" id="speed-value">0</div>
+                <div class="speed-label">km/h</div>
+            </div>
+
+            <!-- Google Maps button -->
+            <button class="gmaps-btn" id="gmaps-btn" onclick="openGoogleMaps()" style="display:none">
+                🗺️ Google Maps
+            </button>
+
+            <!-- Turn instruction -->
+            <div class="turn-instruction" id="turn-instruction">
+                <div class="turn-icon" id="turn-icon">↗️</div>
+                <div class="turn-text" id="turn-text">Lurus terus</div>
+                <div class="turn-distance" id="turn-distance">500m</div>
+            </div>
+        </div>
+
+        <!-- Route Info Bar -->
+        <div class="route-info-bar" id="route-info-bar" style="display:none">
+            <div class="route-info-item">
+                <div class="info-label">Jarak</div>
+                <div class="info-value" id="route-distance">-</div>
+            </div>
+            <div class="route-info-item">
+                <div class="info-label">Estimasi</div>
+                <div class="info-value" id="route-eta">-</div>
+            </div>
+            <div class="route-info-item">
+                <div class="info-label">Kecepatan</div>
+                <div class="info-value" id="route-speed">0 km/h</div>
+            </div>
+        </div>
+
+        <!-- Location Search -->
+        <div class="location-search" id="location-search">
+            <div class="section-header">
+                <h3>📍 Tentukan Rute</h3>
+            </div>
+            <div class="search-input-group">
+                <div class="search-row">
+                    <div class="search-dot pickup"></div>
+                    <input type="text" id="input-pickup" placeholder="Titik jemput (atau lokasi saat ini)"
+                        oninput="handleSearch(this, 'pickup')" onfocus="showSearchResults('pickup')">
+                </div>
+                <div class="search-connector">
+                    <div class="connector-line"></div>
+                </div>
+                <div class="search-row">
+                    <div class="search-dot dropoff"></div>
+                    <input type="text" id="input-dropoff" placeholder="Titik antar (tujuan)"
+                        oninput="handleSearch(this, 'dropoff')" onfocus="showSearchResults('dropoff')">
+                </div>
+            </div>
+
+            <!-- Search Results -->
+            <div class="search-results" id="search-results"></div>
+
+            <!-- Use current location button -->
+            <button class="btn btn-outline btn-full mt-md" onclick="useCurrentLocation()">
+                📍 Gunakan Lokasi Saat Ini sebagai Titik Jemput
+            </button>
+
+            <!-- Find route button -->
+            <button class="btn btn-primary btn-full mt-sm" id="btn-find-route" onclick="findRoute()" disabled>
+                🔍 Cari Rute
+            </button>
+        </div>
+
+        <!-- Delivery List -->
+        <div class="delivery-section" id="delivery-section" style="display:none">
+            <div class="section-header">
+                <h3>📦 Daftar Pengantaran</h3>
+            </div>
+            <div id="delivery-list"></div>
+        </div>
+
+        <!-- Navigation Button -->
+        <div class="nav-action-bar">
+            <button class="btn btn-success btn-full btn-navigate" id="btn-navigate" onclick="toggleNavigation()"
+                style="display:none">
+                🧭 MULAI NAVIGASI
+            </button>
+        </div>
+
+        <!-- Bottom Nav -->
+        <nav class="bottom-nav">
+            <a class="nav-item active" href="main.html">
+                <span class="nav-icon">🗺️</span>
+                Rute
+            </a>
+            <a class="nav-item" href="#" onclick="showDeliveries()">
+                <span class="nav-icon">📦</span>
+                Pengantaran
+            </a>
+            <a class="nav-item" href="#" onclick="showStats()">
+                <span class="nav-icon">📊</span>
+                Status
+            </a>
+            <a class="nav-item" href="#" onclick="Auth.logout()">
+                <span class="nav-icon">👤</span>
+                Profil
+            </a>
+        </nav>
+    </div>
+
+    <!-- Stats Modal -->
+    <div class="modal-backdrop" id="stats-modal">
+        <div class="modal">
+            <div class="modal-title">📊 Statistik Hari Ini</div>
+            <div class="summary-stats" style="margin:0">
+                <div class="summary-stat">
+                    <div class="stat-value" id="modal-distance">0 km</div>
+                    <div class="stat-label">Total Jarak</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="stat-value" id="modal-speed">0 km/h</div>
+                    <div class="stat-label">Rata-rata</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="stat-value" id="modal-time">0m</div>
+                    <div class="stat-label">Waktu</div>
+                </div>
+            </div>
+            <button class="btn btn-outline btn-full mt-lg" onclick="closeModal('stats-modal')">Tutup</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script src="../js/firebase-config.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/map-utils.js"></script>
+    <script src="../js/gps-tracker.js"></script>
+    <script src="../js/speed-monitor.js"></script>
+    <script src="../js/route-engine.js"></script>
+
+    <script>
+        // ---- State ----
+        let map = null;
+        let myMarker = null;
+        let isNavigating = false;
+        let pickupLocation = null;
+        let dropoffLocation = null;
+        let currentSearchType = 'pickup';
+        let searchTimeout = null;
+        let currentDeliveryId = null;
+        let routePolyline = null;
+
+        // ---- Init ----
+        document.addEventListener('DOMContentLoaded', () => {
+            if (isFirebaseConfigured()) {
+                initFirebase();
+                Auth.init();
+            }
+
+            initDriverMap();
+            updateDriverInfo();
+
+            // Start watching location silently
+            startLocationWatch();
+        });
+
+        function initDriverMap() {
+            map = MapUtils.createMap('driver-map', {
+                center: APP_CONFIG.MAP_DEFAULT_CENTER,
+                zoom: 15
+            });
+
+            // Click to set location
+            map.on('click', (e) => {
+                if (!isNavigating) {
+                    handleMapClick(e.latlng.lat, e.latlng.lng);
+                }
+            });
+        }
+
+        function updateDriverInfo() {
+            const name = Auth.userProfile?.name || 'Driver';
+            document.getElementById('driver-name').textContent = name;
+            document.getElementById('driver-avatar').textContent = name.charAt(0).toUpperCase();
+        }
+
+        // ---- Location Watch (passive, always running) ----
+        function startLocationWatch() {
+            if (!navigator.geolocation) return;
+
+            navigator.geolocation.watchPosition(
+                (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    const speed = pos.coords.speed ? pos.coords.speed * 3.6 : 0;
+
+                    updateMyPosition(lat, lng, speed);
+                },
+                (err) => console.warn('GPS:', err.message),
+                { enableHighAccuracy: true, maximumAge: 5000 }
+            );
+        }
+
+        function updateMyPosition(lat, lng, speed) {
+            // Update marker
+            if (myMarker) map.removeLayer(myMarker);
+            myMarker = MapUtils.createDriverMarker(lat, lng, 'Saya', speed);
+            myMarker.addTo(map);
+
+            // Update speed display
+            const speedInt = Math.round(speed);
+            const speedEl = document.getElementById('speed-value');
+            speedEl.textContent = speedInt;
+            speedEl.className = 'speed-now ' + SpeedMonitor.getSpeedClass(speed);
+
+            document.getElementById('route-speed').textContent = speedInt + ' km/h';
+
+            // Check deviation during navigation
+            if (isNavigating && RouteEngine.currentRoute) {
+                const deviation = RouteEngine.checkDeviation(lat, lng);
+                if (deviation.isDeviated) {
+                    showToast(`⚠️ Anda menyimpang ${deviation.distance}m dari rute!`, 'danger');
+                    RouteEngine.logViolation('route_deviation', {
+                        deviationDistance: deviation.distance,
+                        limit: deviation.limit
+                    }, lat, lng);
+                }
+            }
+        }
+
+        // ---- Search Location ----
+        function handleSearch(input, type) {
+            currentSearchType = type;
+            clearTimeout(searchTimeout);
+
+            const query = input.value.trim();
+            if (query.length < 3) {
+                hideSearchResults();
+                return;
+            }
+
+            searchTimeout = setTimeout(async () => {
+                const results = await RouteEngine.searchLocation(query);
+                renderSearchResults(results, type);
+            }, 500);
+        }
+
+        function showSearchResults(type) {
+            currentSearchType = type;
+        }
+
+        function renderSearchResults(results, type) {
+            const container = document.getElementById('search-results');
+            if (results.length === 0) {
+                container.innerHTML = '<div class="search-result-item">Lokasi tidak ditemukan</div>';
+                container.classList.add('show');
+                return;
+            }
+
+            container.innerHTML = results.map(r => `
+        <div class="search-result-item" onclick="selectLocation(${r.lat}, ${r.lng}, '${r.name.replace(/'/g, "\\'")}', '${type}')">
+          📍 ${r.name}
+        </div>
+      `).join('');
+            container.classList.add('show');
+        }
+
+        function hideSearchResults() {
+            document.getElementById('search-results').classList.remove('show');
+        }
+
+        function selectLocation(lat, lng, name, type) {
+            hideSearchResults();
+
+            if (type === 'pickup') {
+                pickupLocation = { lat, lng, name };
+                document.getElementById('input-pickup').value = name.split(',')[0];
+            } else {
+                dropoffLocation = { lat, lng, name };
+                document.getElementById('input-dropoff').value = name.split(',')[0];
+            }
+
+            // Enable find route button
+            checkCanFindRoute();
+
+            // Show marker on map
+            if (type === 'pickup') {
+                const marker = MapUtils.createPickupMarker(lat, lng, 'Jemput');
+                marker.addTo(map);
+            } else {
+                const marker = MapUtils.createDropoffMarker(lat, lng, 'Antar');
+                marker.addTo(map);
+            }
+
+            map.setView([lat, lng], 15);
+        }
+
+        function handleMapClick(lat, lng) {
+            RouteEngine.reverseGeocode(lat, lng).then(name => {
+                if (!pickupLocation) {
+                    selectLocation(lat, lng, name, 'pickup');
+                } else if (!dropoffLocation) {
+                    selectLocation(lat, lng, name, 'dropoff');
+                }
+            });
+        }
+
+        async function useCurrentLocation() {
+            if (!navigator.geolocation) {
+                showToast('GPS tidak didukung', 'danger');
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                async (pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    const name = await RouteEngine.reverseGeocode(lat, lng);
+                    selectLocation(lat, lng, name, 'pickup');
+                    map.setView([lat, lng], 16);
+                },
+                (err) => showToast('Tidak bisa mendapatkan lokasi: ' + err.message, 'danger'),
+                { enableHighAccuracy: true }
+            );
+        }
+
+        function checkCanFindRoute() {
+            const btn = document.getElementById('btn-find-route');
+            btn.disabled = !(pickupLocation && dropoffLocation);
+        }
+
+        // ---- Find Route ----
+        async function findRoute() {
+            if (!pickupLocation || !dropoffLocation) return;
+
+            const btn = document.getElementById('btn-find-route');
+            btn.disabled = true;
+            btn.innerHTML = '<div class="spinner" style="width:18px;height:18px;border-width:2px"></div> Mencari rute...';
+
+            try {
+                const route = await RouteEngine.getRoute(
+                    pickupLocation.lat, pickupLocation.lng,
+                    dropoffLocation.lat, dropoffLocation.lng
+                );
+
+                // Draw route on map
+                RouteEngine.drawOnMap(map, route);
+
+                // Add markers
+                const pickupMarker = MapUtils.createPickupMarker(pickupLocation.lat, pickupLocation.lng, 'Jemput');
+                const dropoffMarker = MapUtils.createDropoffMarker(dropoffLocation.lat, dropoffLocation.lng, 'Antar');
+                pickupMarker.addTo(map);
+                dropoffMarker.addTo(map);
+
+                // Fit map to route
+                map.fitBounds(L.latLngBounds(route.coordinates).pad(0.1));
+
+                // Show route info
+                document.getElementById('route-info-bar').style.display = 'flex';
+                document.getElementById('route-distance').textContent = RouteEngine.formatDistance(route.distance);
+                document.getElementById('route-eta').textContent = RouteEngine.formatDuration(route.duration);
+
+                // Show navigate button & google maps button
+                document.getElementById('btn-navigate').style.display = 'flex';
+                document.getElementById('gmaps-btn').style.display = 'flex';
+
+                // Generate delivery ID
+                currentDeliveryId = 'DEL-' + Date.now().toString(36).toUpperCase();
+
+                showToast('✅ Rute ditemukan!', 'success');
+
+            } catch (error) {
+                showToast('❌ Gagal mencari rute: ' + error.message, 'danger');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🔍 Cari Rute';
+            }
+        }
+
+        // ---- Toggle Navigation ----
+        function toggleNavigation() {
+            if (isNavigating) {
+                stopNavigation();
+            } else {
+                startNavigation();
+            }
+        }
+
+        function startNavigation() {
+            isNavigating = true;
+
+            const btn = document.getElementById('btn-navigate');
+            btn.textContent = '⏹️ SELESAI NAVIGASI';
+            btn.classList.add('active');
+
+            // Hide search
+            document.getElementById('location-search').style.display = 'none';
+
+            // Start GPS tracking with full features
+            GPSTracker.start({
+                onUpdate: (pos) => {
+                    updateMyPosition(pos.lat, pos.lng, pos.speed);
+                    map.setView([pos.lat, pos.lng], map.getZoom());
+
+                    // Update route info
+                    document.getElementById('route-speed').textContent = Math.round(pos.speed) + ' km/h';
+
+                    // Check speed violations
+                    const speedCheck = SpeedMonitor.check(pos.speed, pos);
+                    if (speedCheck.isViolation) {
+                        showToast(`🚨 Kecepatan berlebih! ${speedCheck.speed} km/h (Batas: ${speedCheck.limit} km/h)`, 'danger');
+                    }
+                },
+                onSpeedViolation: (speed, pos) => {
+                    // Already handled above
+                },
+                onError: (msg) => {
+                    showToast('⚠️ GPS Error: ' + msg, 'danger');
+                }
+            });
+
+            // Keep screen on
+            GPSTracker.keepScreenOn();
+
+            // Save delivery to Firebase
+            if (isFirebaseConfigured()) {
+                RouteEngine.saveDeliveryRoute(currentDeliveryId, pickupLocation, dropoffLocation);
+            }
+
+            showToast('🧭 Navigasi dimulai!', 'success');
+        }
+
+        function stopNavigation() {
+            isNavigating = false;
+
+            const btn = document.getElementById('btn-navigate');
+            btn.textContent = '🧭 MULAI NAVIGASI';
+            btn.classList.remove('active');
+
+            // Stop GPS
+            GPSTracker.stop();
+            GPSTracker.releaseScreenLock();
+
+            // Show search again
+            document.getElementById('location-search').style.display = 'block';
+
+            // Update delivery status
+            if (isFirebaseConfigured() && currentDeliveryId) {
+                db.collection('deliveries').doc(currentDeliveryId).update({
+                    status: 'completed',
+                    completedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }).catch(console.error);
+            }
+
+            // Show stats
+            const stats = GPSTracker.getStats();
+            document.getElementById('modal-distance').textContent = stats.totalDistanceKm + ' km';
+            document.getElementById('modal-speed').textContent = stats.avgSpeed + ' km/h';
+            document.getElementById('modal-time').textContent = stats.elapsedTimeFormatted;
+            document.getElementById('stats-modal').classList.add('active');
+
+            showToast('✅ Navigasi selesai!', 'success');
+
+            // Reset
+            pickupLocation = null;
+            dropoffLocation = null;
+            document.getElementById('input-pickup').value = '';
+            document.getElementById('input-dropoff').value = '';
+            document.getElementById('route-info-bar').style.display = 'none';
+            document.getElementById('btn-navigate').style.display = 'none';
+            document.getElementById('gmaps-btn').style.display = 'none';
+            RouteEngine.clearRoute(map);
+        }
+
+        // ---- Open Google Maps ----
+        function openGoogleMaps() {
+            if (!dropoffLocation) return;
+            const url = `https://www.google.com/maps/dir/?api=1&destination=${dropoffLocation.lat},${dropoffLocation.lng}&travelmode=driving`;
+            window.open(url, '_blank');
+        }
+
+        // ---- Show Deliveries ----
+        function showDeliveries() {
+            // Toggle delivery section
+            const section = document.getElementById('delivery-section');
+            section.style.display = section.style.display === 'none' ? 'block' : 'none';
+        }
+
+        // ---- Show Stats ----
+        function showStats() {
+            const stats = GPSTracker.getStats();
+            document.getElementById('modal-distance').textContent = stats.totalDistanceKm + ' km';
+            document.getElementById('modal-speed').textContent = stats.avgSpeed + ' km/h';
+            document.getElementById('modal-time').textContent = stats.elapsedTimeFormatted;
+            document.getElementById('stats-modal').classList.add('active');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('active');
+        }
+
+        function toggleSettings() {
+            alert('Settings akan tersedia di update berikutnya');
+        }
+
+        // ---- Toast Notification ----
+        function showToast(message, type = 'info') {
+            // Remove existing toast
+            const existing = document.querySelector('.toast');
+            if (existing) existing.remove();
+
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `<span>${message}</span>`;
+            document.body.appendChild(toast);
+
+            requestAnimationFrame(() => {
+                toast.classList.add('show');
+            });
+
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 400);
+            }, 4000);
+        }
+
+        // Close search results on outside click
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.location-search')) {
+                hideSearchResults();
+            }
+        });
+    </script>
+</body>
+
+</html>

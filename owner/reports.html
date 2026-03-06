@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="KurirTrack - Laporan">
+    <meta name="theme-color" content="#4e7cff">
+    <title>KurirTrack - Laporan</title>
+    <link rel="manifest" href="../manifest.json">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/owner.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <div class="report-header">
+            <h2>📈 Laporan</h2>
+            <div class="date-filter" id="date-filter" onclick="showDatePicker()">
+                📅 <span id="filter-date">Hari Ini</span>
+            </div>
+        </div>
+
+        <!-- Speed Chart -->
+        <div class="report-card">
+            <h3>Laporan Kecepatan</h3>
+            <div class="chart-container">
+                <canvas id="speed-chart"></canvas>
+            </div>
+            <p class="text-xs text-muted mt-sm">Garis merah = Batas kecepatan (${APP_CONFIG?.SPEED_LIMIT || 50} km/h)
+            </p>
+        </div>
+
+        <!-- Speed Violations -->
+        <div class="report-card">
+            <div class="flex justify-between items-center mb-md">
+                <h3>🚨 Pelanggaran Kecepatan</h3>
+                <span class="badge badge-danger" id="violation-count">0 kali</span>
+            </div>
+            <div id="violations-list">
+                <div class="empty-state">
+                    <div class="empty-icon">✅</div>
+                    <p>Tidak ada pelanggaran hari ini</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Route Deviations -->
+        <div class="report-card">
+            <h3>🗺️ Penyimpangan Rute</h3>
+            <div id="deviations-list">
+                <div class="empty-state">
+                    <div class="empty-icon">✅</div>
+                    <p>Tidak ada penyimpangan rute hari ini</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Summary Stats -->
+        <div class="report-card">
+            <h3>📊 Ringkasan</h3>
+            <div class="summary-stats">
+                <div class="summary-stat">
+                    <div class="stat-value" id="summary-distance">0 km</div>
+                    <div class="stat-label">Total Jarak</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="stat-value" id="summary-speed">0 km/h</div>
+                    <div class="stat-label">Rata-rata</div>
+                </div>
+                <div class="summary-stat">
+                    <div class="stat-value" id="summary-time">0j 0m</div>
+                    <div class="stat-label">Waktu Tempuh</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Nav -->
+        <nav class="bottom-nav">
+            <a class="nav-item" href="dashboard.html">
+                <span class="nav-icon">📊</span>
+                Dashboard
+            </a>
+            <a class="nav-item active" href="reports.html">
+                <span class="nav-icon">📈</span>
+                Laporan
+            </a>
+            <a class="nav-item" href="#" onclick="Auth.logout()">
+                <span class="nav-icon">👤</span>
+                Profil
+            </a>
+        </nav>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+    <script src="../js/firebase-config.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/map-utils.js"></script>
+    <script src="../js/speed-monitor.js"></script>
+    <script src="../js/route-engine.js"></script>
+
+    <script>
+        // ---- Init ----
+        document.addEventListener('DOMContentLoaded', () => {
+            if (isFirebaseConfigured()) {
+                initFirebase();
+                Auth.init();
+            }
+
+            updateDateFilter();
+            setTimeout(() => loadReports(), 500);
+        });
+
+        function updateDateFilter() {
+            const now = new Date();
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            document.getElementById('filter-date').textContent = `Hari Ini - ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+        }
+
+        function showDatePicker() {
+            // Simple date picker - for now just toggle
+            alert('Filter tanggal akan tersedia di update berikutnya');
+        }
+
+        // ---- Load Reports ----
+        async function loadReports() {
+            if (isFirebaseConfigured()) {
+                await loadFirebaseReports();
+            } else {
+                loadDemoReports();
+            }
+        }
+
+        function loadDemoReports() {
+            // Draw speed chart
+            drawSpeedChart();
+
+            // Demo violations
+            const violations = SpeedMonitor.getDemoViolations();
+            document.getElementById('violation-count').textContent = `${violations.length} kali`;
+            renderViolations(violations);
+
+            // Demo deviations
+            renderDeviations([
+                { driverName: 'Ahmad', distance: 1200, time: '10:32', lat: -3.3210, lng: 114.5930 },
+            ]);
+
+            // Summary
+            document.getElementById('summary-distance').textContent = '45.6 km';
+            document.getElementById('summary-speed').textContent = '38 km/h';
+            document.getElementById('summary-time').textContent = '2j 15m';
+        }
+
+        async function loadFirebaseReports() {
+            try {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+
+                // Get speed violations
+                const violationsSnap = await db.collection('violations')
+                    .where('type', '==', 'speed')
+                    .where('timestamp', '>=', today)
+                    .orderBy('timestamp', 'desc')
+                    .get();
+
+                const violations = [];
+                for (const doc of violationsSnap.docs) {
+                    const data = doc.data();
+                    // Get driver name
+                    const userDoc = await db.collection('users').doc(data.driverId).get();
+                    violations.push({
+                        ...data,
+                        driverName: userDoc.exists ? userDoc.data().name : 'Unknown'
+                    });
+                }
+
+                document.getElementById('violation-count').textContent = `${violations.length} kali`;
+                renderViolations(violations);
+
+                // Get route deviations
+                const deviationsSnap = await db.collection('violations')
+                    .where('type', '==', 'route_deviation')
+                    .where('timestamp', '>=', today)
+                    .orderBy('timestamp', 'desc')
+                    .get();
+
+                const deviations = [];
+                for (const doc of deviationsSnap.docs) {
+                    const data = doc.data();
+                    const userDoc = await db.collection('users').doc(data.driverId).get();
+                    deviations.push({
+                        ...data,
+                        driverName: userDoc.exists ? userDoc.data().name : 'Unknown',
+                        distance: data.details?.deviationDistance || 0,
+                        time: data.timestamp?.toDate ?
+                            data.timestamp.toDate().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '--'
+                    });
+                }
+
+                renderDeviations(deviations);
+
+                drawSpeedChart();
+
+            } catch (error) {
+                console.error('Load reports error:', error);
+                loadDemoReports();
+            }
+        }
+
+        // ---- Render Violations ----
+        function renderViolations(violations) {
+            const container = document.getElementById('violations-list');
+            if (violations.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><p>Tidak ada pelanggaran hari ini</p></div>';
+                return;
+            }
+
+            container.innerHTML = violations.map(v => {
+                const time = v.timestamp?.toDate
+                    ? v.timestamp.toDate().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+                    : new Date(v.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                const speed = v.details?.recordedSpeed || v.speed || 0;
+
+                return `
+          <div class="violation-item">
+            <div class="violation-info">
+              <span class="violation-driver">${v.driverName || 'Driver'}</span>
+              <span class="violation-time">${time}</span>
+            </div>
+            <span class="violation-speed text-danger">${speed} km/h</span>
+          </div>
+        `;
+            }).join('');
+        }
+
+        // ---- Render Deviations ----
+        function renderDeviations(deviations) {
+            const container = document.getElementById('deviations-list');
+            if (deviations.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-icon">✅</div><p>Tidak ada penyimpangan rute hari ini</p></div>';
+                return;
+            }
+
+            container.innerHTML = deviations.map(d => `
+        <div class="violation-item">
+          <div class="violation-info">
+            <span class="violation-driver">${d.driverName} menyimpang ${(d.distance / 1000).toFixed(1)} km dari rute</span>
+            <span class="violation-time">pada ${d.time}</span>
+          </div>
+          <span class="badge badge-warning">⚠️</span>
+        </div>
+      `).join('');
+        }
+
+        // ---- Draw Speed Chart (Canvas) ----
+        function drawSpeedChart() {
+            const canvas = document.getElementById('speed-chart');
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.width = rect.width * 2;
+            canvas.height = rect.height * 2;
+            canvas.style.width = rect.width + 'px';
+            canvas.style.height = rect.height + 'px';
+            ctx.scale(2, 2);
+
+            const w = rect.width;
+            const h = rect.height;
+            const padding = { top: 20, right: 20, bottom: 30, left: 40 };
+            const chartW = w - padding.left - padding.right;
+            const chartH = h - padding.top - padding.bottom;
+
+            // Generate demo speed data
+            const hours = ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'];
+            const speeds = [32, 45, 38, 52, 28, 35, 58, 42, 48, 30];
+            const maxSpeed = 80;
+
+            // Background
+            ctx.fillStyle = '#0f1117';
+            ctx.fillRect(0, 0, w, h);
+
+            // Speed zones
+            const zoneH = chartH / 3;
+            // Green zone (0-33%)
+            ctx.fillStyle = 'rgba(34, 197, 94, 0.08)';
+            ctx.fillRect(padding.left, padding.top + zoneH * 2, chartW, zoneH);
+            // Yellow zone (33-66%)
+            ctx.fillStyle = 'rgba(245, 158, 11, 0.06)';
+            ctx.fillRect(padding.left, padding.top + zoneH, chartW, zoneH);
+            // Red zone (66-100%)
+            ctx.fillStyle = 'rgba(239, 68, 68, 0.05)';
+            ctx.fillRect(padding.left, padding.top, chartW, zoneH);
+
+            // Speed limit line
+            const limitY = padding.top + chartH - (APP_CONFIG.SPEED_LIMIT / maxSpeed) * chartH;
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 1;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            ctx.moveTo(padding.left, limitY);
+            ctx.lineTo(w - padding.right, limitY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Label for speed limit
+            ctx.fillStyle = '#ef4444';
+            ctx.font = '9px Inter, sans-serif';
+            ctx.fillText('Batas', w - padding.right - 30, limitY - 4);
+
+            // Grid lines
+            ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+            ctx.lineWidth = 0.5;
+            for (let i = 0; i <= 4; i++) {
+                const y = padding.top + (chartH / 4) * i;
+                ctx.beginPath();
+                ctx.moveTo(padding.left, y);
+                ctx.lineTo(w - padding.right, y);
+                ctx.stroke();
+
+                // Y-axis labels
+                ctx.fillStyle = '#6b7280';
+                ctx.font = '9px Inter, sans-serif';
+                ctx.textAlign = 'right';
+                ctx.fillText(Math.round(maxSpeed - (maxSpeed / 4) * i) + '', padding.left - 6, y + 3);
+            }
+
+            // X-axis labels
+            ctx.fillStyle = '#6b7280';
+            ctx.textAlign = 'center';
+            hours.forEach((label, i) => {
+                const x = padding.left + (chartW / (hours.length - 1)) * i;
+                ctx.fillText(label, x, h - 8);
+            });
+
+            // Speed line
+            ctx.strokeStyle = '#4e7cff';
+            ctx.lineWidth = 2.5;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+
+            const points = speeds.map((speed, i) => ({
+                x: padding.left + (chartW / (speeds.length - 1)) * i,
+                y: padding.top + chartH - (speed / maxSpeed) * chartH
+            }));
+
+            // Smooth curve
+            points.forEach((point, i) => {
+                if (i === 0) {
+                    ctx.moveTo(point.x, point.y);
+                } else {
+                    const prev = points[i - 1];
+                    const cpx = (prev.x + point.x) / 2;
+                    ctx.bezierCurveTo(cpx, prev.y, cpx, point.y, point.x, point.y);
+                }
+            });
+            ctx.stroke();
+
+            // Gradient fill under line
+            const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartH);
+            gradient.addColorStop(0, 'rgba(78, 124, 255, 0.2)');
+            gradient.addColorStop(1, 'rgba(78, 124, 255, 0)');
+
+            ctx.lineTo(points[points.length - 1].x, padding.top + chartH);
+            ctx.lineTo(points[0].x, padding.top + chartH);
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            // Dots on data points
+            points.forEach((point, i) => {
+                const isViolation = speeds[i] > APP_CONFIG.SPEED_LIMIT;
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, isViolation ? 4 : 3, 0, Math.PI * 2);
+                ctx.fillStyle = isViolation ? '#ef4444' : '#4e7cff';
+                ctx.fill();
+                if (isViolation) {
+                    ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)';
+                    ctx.lineWidth = 6;
+                    ctx.stroke();
+                }
+            });
+        }
+
+        // Re-draw chart on resize
+        window.addEventListener('resize', () => {
+            setTimeout(drawSpeedChart, 100);
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="KurirTrack - Dashboard Owner">
+    <meta name="theme-color" content="#4e7cff">
+    <title>KurirTrack - Dashboard</title>
+    <link rel="manifest" href="../manifest.json">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="../css/global.css">
+    <link rel="stylesheet" href="../css/owner.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <div class="owner-header">
+            <div class="owner-greeting">
+                <h2 id="greeting-text">Selamat Pagi, Boss</h2>
+                <p id="greeting-date"></p>
+            </div>
+            <div class="header-actions">
+                <button class="icon-btn" onclick="loadData()" title="Refresh">🔄</button>
+                <button class="icon-btn" id="notif-btn" title="Notifikasi">
+                    🔔
+                    <span class="notif-dot" id="notif-dot" style="display:none;"></span>
+                </button>
+                <button class="icon-btn" onclick="Auth.logout()" title="Logout">🚪</button>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="stats-row">
+            <div class="stat-card stat-active">
+                <div class="stat-value text-success" id="stat-active">0</div>
+                <div class="stat-label">Aktif</div>
+                <div class="stat-sub">Driver Online</div>
+            </div>
+            <div class="stat-card stat-delivery">
+                <div class="stat-value text-accent" id="stat-deliveries">0</div>
+                <div class="stat-label">Pengantaran</div>
+                <div class="stat-sub">Hari Ini</div>
+            </div>
+            <div class="stat-card stat-alert">
+                <div class="stat-value text-danger" id="stat-alerts">0</div>
+                <div class="stat-label">Alert</div>
+                <div class="stat-sub">Perlu Perhatian</div>
+            </div>
+        </div>
+
+        <!-- Alert Banner -->
+        <div class="alert-banner" id="alert-banner">
+            <div class="alert-icon">🚨</div>
+            <div class="alert-content">
+                <h4 id="alert-title">Pelanggaran Terdeteksi</h4>
+                <p id="alert-message"></p>
+            </div>
+        </div>
+
+        <!-- Map -->
+        <div class="map-section">
+            <div class="section-header">
+                <h3>📍 Lokasi Kurir</h3>
+                <span class="section-action" onclick="centerMap()">Lihat Semua</span>
+            </div>
+            <div class="map-container" id="owner-map"></div>
+        </div>
+
+        <!-- Driver List -->
+        <div class="driver-list-section">
+            <div class="section-header">
+                <h3>Status Kurir</h3>
+                <span class="badge badge-info" id="driver-count">0 driver</span>
+            </div>
+            <div id="driver-list">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+
+        <!-- Bottom Nav -->
+        <nav class="bottom-nav">
+            <a class="nav-item active" href="dashboard.html">
+                <span class="nav-icon">📊</span>
+                Dashboard
+            </a>
+            <a class="nav-item" href="reports.html">
+                <span class="nav-icon">📈</span>
+                Laporan
+            </a>
+            <a class="nav-item" href="#" onclick="Auth.logout()">
+                <span class="nav-icon">👤</span>
+                Profil
+            </a>
+        </nav>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script src="../js/firebase-config.js"></script>
+    <script src="../js/auth.js"></script>
+    <script src="../js/map-utils.js"></script>
+    <script src="../js/speed-monitor.js"></script>
+    <script src="../js/route-engine.js"></script>
+
+    <script>
+        // ---- State ----
+        let map = null;
+        let driverMarkers = {};
+        let trackingListeners = {};
+        let alertCount = 0;
+
+        // ---- Demo Data ----
+        const DEMO_DRIVERS = [
+            { id: 'd1', name: 'Ahmad Rizki', initials: 'AR', color: '#4e7cff', lat: -3.3200, lng: 114.5920, speed: 42, isOnline: true, status: 'Dalam Perjalanan' },
+            { id: 'd2', name: 'Budi Santoso', initials: 'BS', color: '#22c55e', lat: -3.3100, lng: 114.5850, speed: 0, isOnline: true, status: 'Istirahat' },
+            { id: 'd3', name: 'Citra Dewi', initials: 'CD', color: '#8b5cf6', lat: -3.3250, lng: 114.5950, speed: 38, isOnline: true, status: 'Dalam Perjalanan' },
+            { id: 'd4', name: 'Deni Kurniawan', initials: 'DK', color: '#f59e0b', lat: -3.3180, lng: 114.5800, speed: 55, isOnline: false, status: 'Offline' },
+            { id: 'd5', name: 'Eko Prasetyo', initials: 'EP', color: '#ef4444', lat: -3.3150, lng: 114.5880, speed: 35, isOnline: true, status: 'Dalam Perjalanan' },
+        ];
+
+        // ---- Initialize ----
+        document.addEventListener('DOMContentLoaded', () => {
+            if (isFirebaseConfigured()) {
+                initFirebase();
+                Auth.init();
+            }
+
+            updateGreeting();
+            initMap();
+
+            // Wait a bit for auth, then load
+            setTimeout(() => loadData(), 500);
+        });
+
+        function updateGreeting() {
+            const hour = new Date().getHours();
+            let greeting = 'Selamat Malam';
+            if (hour < 11) greeting = 'Selamat Pagi';
+            else if (hour < 15) greeting = 'Selamat Siang';
+            else if (hour < 18) greeting = 'Selamat Sore';
+
+            const name = Auth.userProfile?.name || 'Boss';
+            document.getElementById('greeting-text').textContent = `${greeting}, ${name.split(' ')[0]}`;
+
+            const now = new Date();
+            const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+            document.getElementById('greeting-date').textContent =
+                `${days[now.getDay()]}, ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+        }
+
+        function initMap() {
+            map = MapUtils.createMap('owner-map');
+        }
+
+        // ---- Load Data ----
+        async function loadData() {
+            // Always use demo data in demo mode
+            if (Auth.isDemoMode()) {
+                loadDemoData();
+                return;
+            }
+
+            if (isFirebaseConfigured() && Auth.currentUser) {
+                await loadFirebaseData();
+            } else {
+                loadDemoData();
+            }
+        }
+
+        function loadDemoData() {
+            const activeDrivers = DEMO_DRIVERS.filter(d => d.isOnline);
+
+            // Update stats
+            document.getElementById('stat-active').textContent = activeDrivers.length;
+            document.getElementById('stat-deliveries').textContent = Math.floor(Math.random() * 15) + 5;
+
+            // Check violations
+            const speedViolations = DEMO_DRIVERS.filter(d => d.speed > APP_CONFIG.SPEED_LIMIT);
+            alertCount = speedViolations.length;
+            document.getElementById('stat-alerts').textContent = alertCount;
+
+            if (alertCount > 0) {
+                document.getElementById('notif-dot').style.display = 'block';
+                const v = speedViolations[0];
+                showAlert(`${v.name} melebihi batas kecepatan`, `Kecepatan ${v.speed} km/h (Batas: ${APP_CONFIG.SPEED_LIMIT} km/h)`);
+            }
+
+            // Update map markers
+            DEMO_DRIVERS.forEach(driver => {
+                if (driver.isOnline) {
+                    updateDriverMarker(driver);
+                }
+            });
+
+            // Fit map to markers
+            centerMap();
+
+            // Update driver list
+            updateDriverList(DEMO_DRIVERS);
+            document.getElementById('driver-count').textContent = `${DEMO_DRIVERS.length} driver`;
+
+            // Simulate movement for demo
+            setInterval(() => {
+                DEMO_DRIVERS.forEach(driver => {
+                    if (driver.isOnline && driver.speed > 0) {
+                        driver.lat += (Math.random() - 0.5) * 0.001;
+                        driver.lng += (Math.random() - 0.5) * 0.001;
+                        driver.speed = Math.max(0, driver.speed + (Math.random() - 0.5) * 10);
+                        updateDriverMarker(driver);
+                    }
+                });
+            }, 5000);
+        }
+
+        async function loadFirebaseData() {
+            try {
+                // Listen to all drivers' tracking data
+                const usersSnap = await db.collection('users').where('role', '==', 'driver').get();
+                const drivers = [];
+
+                usersSnap.forEach(doc => {
+                    const data = doc.data();
+                    drivers.push({ id: doc.id, ...data, isOnline: false, speed: 0, lat: 0, lng: 0 });
+                });
+
+                document.getElementById('driver-count').textContent = `${drivers.length} driver`;
+
+                // Listen to realtime tracking
+                drivers.forEach(driver => {
+                    if (trackingListeners[driver.id]) return;
+
+                    trackingListeners[driver.id] = rtdb.ref(`tracking/${driver.id}`).on('value', (snapshot) => {
+                        const tracking = snapshot.val();
+                        if (tracking) {
+                            driver.lat = tracking.lat;
+                            driver.lng = tracking.lng;
+                            driver.speed = tracking.speed || 0;
+                            driver.isOnline = tracking.isOnline || false;
+                            driver.initials = driver.name ? driver.name.split(' ').map(n => n[0]).join('').substring(0, 2) : '??';
+                            driver.color = '#4e7cff';
+                            driver.status = driver.isOnline ? (driver.speed > 0 ? 'Dalam Perjalanan' : 'Istirahat') : 'Offline';
+
+                            if (driver.isOnline && driver.lat) {
+                                updateDriverMarker(driver);
+                            }
+
+                            // Check speed violation
+                            if (driver.speed > APP_CONFIG.SPEED_LIMIT) {
+                                alertCount++;
+                                showAlert(
+                                    `${driver.name} melebihi batas kecepatan`,
+                                    `Kecepatan ${Math.round(driver.speed)} km/h (Batas: ${APP_CONFIG.SPEED_LIMIT} km/h)`
+                                );
+                            }
+                        }
+
+                        // Update stats
+                        const activeCount = drivers.filter(d => d.isOnline).length;
+                        document.getElementById('stat-active').textContent = activeCount;
+                        document.getElementById('stat-alerts').textContent = alertCount;
+                        updateDriverList(drivers);
+                    });
+                });
+
+                // Count today's deliveries
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const deliveriesSnap = await db.collection('deliveries')
+                    .where('createdAt', '>=', today)
+                    .get();
+                document.getElementById('stat-deliveries').textContent = deliveriesSnap.size;
+
+            } catch (error) {
+                console.error('Load data error:', error);
+                loadDemoData(); // Fallback to demo
+            }
+        }
+
+        // ---- Update Driver Marker on Map ----
+        function updateDriverMarker(driver) {
+            if (driverMarkers[driver.id]) {
+                map.removeLayer(driverMarkers[driver.id]);
+            }
+            const marker = MapUtils.createDriverMarker(driver.lat, driver.lng, driver.name.split(' ')[0], driver.speed);
+            marker.addTo(map);
+            driverMarkers[driver.id] = marker;
+        }
+
+        // ---- Center Map ----
+        function centerMap() {
+            const markers = Object.values(driverMarkers);
+            if (markers.length > 0) {
+                MapUtils.fitBounds(map, markers);
+            }
+        }
+
+        // ---- Show Alert ----
+        function showAlert(title, message) {
+            document.getElementById('alert-title').textContent = title;
+            document.getElementById('alert-message').textContent = message;
+            document.getElementById('alert-banner').classList.add('show');
+            document.getElementById('notif-dot').style.display = 'block';
+        }
+
+        // ---- Update Driver List ----
+        function updateDriverList(drivers) {
+            const container = document.getElementById('driver-list');
+            container.innerHTML = drivers.map(driver => {
+                const speedClass = SpeedMonitor.getSpeedClass(driver.speed);
+                const statusBadge = driver.isOnline
+                    ? (driver.speed > 0 ? 'badge-success' : 'badge-warning')
+                    : 'badge-info';
+                const routeStatus = driver.speed > APP_CONFIG.SPEED_LIMIT
+                    ? `<span class="text-danger">⚠️ Kecepatan Berlebih</span>`
+                    : `<span class="text-success">✅ Normal</span>`;
+
+                return `
+          <div class="driver-card">
+            <div class="driver-card-content">
+              <div class="driver-avatar" style="background: ${driver.color || '#4e7cff'}">
+                ${driver.initials || '??'}
+              </div>
+              <div class="driver-info">
+                <div class="driver-name">${driver.name}</div>
+                <div class="driver-detail">
+                  <span class="speed-display">
+                    <span class="speed-value ${speedClass}" style="font-size:1rem">${Math.round(driver.speed)}</span>
+                    <span class="speed-unit">km/h</span>
+                  </span>
+                  <span class="badge ${statusBadge}">
+                    <span class="badge-dot ${driver.isOnline ? 'green' : 'blue'}"></span>
+                    ${driver.status}
+                  </span>
+                </div>
+              </div>
+              <div class="driver-meta">
+                <div class="route-status">${routeStatus}</div>
+              </div>
+            </div>
+          </div>
+        `;
+            }).join('');
+        }
+    </script>
+</body>
+
+</html>
