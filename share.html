@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="KurirTrack - Kirim Lokasi ke Driver">
+    <meta name="theme-color" content="#4e7cff">
+    <title>KurirTrack - Kirim Lokasi</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="css/global.css">
+    <style>
+        .share-container {
+            min-height: 100vh;
+            background: var(--bg-primary, #0f1117);
+            color: #fff;
+            font-family: 'Inter', -apple-system, sans-serif;
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+
+        .share-header {
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--bg-card, #1a1d28);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .share-header h2 {
+            font-size: 1.1rem;
+            margin: 0;
+        }
+
+        .share-header .back-btn {
+            background: none;
+            border: none;
+            color: #fff;
+            font-size: 1.3rem;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .share-map {
+            height: 280px;
+            width: 100%;
+        }
+
+        .share-info {
+            padding: 20px;
+        }
+
+        .share-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px;
+            border-radius: 14px;
+            margin-bottom: 16px;
+            font-size: 0.9rem;
+        }
+
+        .status-success {
+            background: rgba(34, 197, 94, 0.12);
+            color: #22c55e;
+        }
+
+        .status-error {
+            background: rgba(239, 68, 68, 0.12);
+            color: #ef4444;
+        }
+
+        .status-loading {
+            background: rgba(78, 124, 255, 0.12);
+            color: #4e7cff;
+        }
+
+        .share-field {
+            margin-bottom: 16px;
+        }
+
+        .share-field label {
+            display: block;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 0.75rem;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .share-field input,
+        .share-field select {
+            width: 100%;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.06);
+            color: #fff;
+            font-size: 0.95rem;
+            outline: none;
+            box-sizing: border-box;
+        }
+
+        .share-field input:focus,
+        .share-field select:focus {
+            border-color: #4e7cff;
+        }
+
+        .share-field select option {
+            background: #1a1d28;
+            color: #fff;
+        }
+
+        .coord-display {
+            display: flex;
+            gap: 8px;
+        }
+
+        .coord-display input {
+            flex: 1;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .share-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 0 20px 20px;
+        }
+
+        .btn-whatsapp {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #25D366, #128C7E);
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn-whatsapp:active {
+            transform: scale(0.97);
+        }
+
+        .btn-whatsapp:disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .btn-copy {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 14px;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-gmaps {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+
+        .driver-select-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+            margin-bottom: 8px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .driver-select-item.selected {
+            border-color: #4e7cff;
+            background: rgba(78, 124, 255, 0.1);
+        }
+
+        .driver-select-item .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #4e7cff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+        }
+
+        .manual-input-section {
+            padding: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .manual-input-section h3 {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.7);
+            margin: 0 0 12px;
+        }
+
+        .paste-area {
+            width: 100%;
+            padding: 14px;
+            border-radius: 12px;
+            border: 2px dashed rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.03);
+            color: #fff;
+            font-size: 0.9rem;
+            min-height: 60px;
+            resize: none;
+            outline: none;
+            box-sizing: border-box;
+            font-family: inherit;
+        }
+
+        .paste-area:focus {
+            border-color: #4e7cff;
+        }
+
+        .btn-parse {
+            margin-top: 10px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            background: #4e7cff;
+            color: #fff;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="share-container">
+        <!-- Header -->
+        <div class="share-header">
+            <button class="back-btn" onclick="window.location.href='/owner/dashboard.html'">←</button>
+            <h2>📍 Kirim Lokasi ke Driver</h2>
+        </div>
+
+        <!-- Status -->
+        <div style="padding: 16px 20px 0;">
+            <div class="share-status status-loading" id="status-bar">
+                <span>⏳</span>
+                <span id="status-text">Memproses lokasi...</span>
+            </div>
+        </div>
+
+        <!-- Map -->
+        <div style="padding: 16px 20px;">
+            <div class="share-map" id="share-map" style="border-radius: 16px; overflow: hidden;"></div>
+        </div>
+
+        <!-- Location Info -->
+        <div class="share-info" id="location-info" style="display:none;">
+            <div class="share-field">
+                <label>Nama Lokasi</label>
+                <input type="text" id="location-name" placeholder="Contoh: Toko ABC, Jl. Sudirman">
+            </div>
+
+            <div class="share-field">
+                <label>Koordinat</label>
+                <div class="coord-display">
+                    <input type="text" id="coord-lat" readonly>
+                    <input type="text" id="coord-lng" readonly>
+                </div>
+            </div>
+
+            <div class="share-field">
+                <label>Pilih Driver</label>
+                <div id="driver-list">
+                    <!-- Dynamic driver list -->
+                </div>
+                <div style="margin-top: 8px;">
+                    <input type="tel" id="manual-phone" placeholder="Atau masukkan nomor WA driver (08xx)"
+                        style="width:100%; padding:12px 14px; border-radius:12px; border:1px solid rgba(255,255,255,0.1); background:rgba(255,255,255,0.06); color:#fff; font-size:0.95rem; outline:none; box-sizing:border-box;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="share-actions" id="action-buttons" style="display:none;">
+            <button class="btn-whatsapp" id="btn-send-wa" onclick="sendToWhatsApp()" disabled>
+                💬 Kirim ke Driver via WhatsApp
+            </button>
+            <button class="btn-copy" onclick="copyLink()">
+                📋 Copy Link
+            </button>
+            <button class="btn-gmaps" onclick="openInGoogleMaps()">
+                🗺️ Lihat di Google Maps
+            </button>
+        </div>
+
+        <!-- Manual Input (fallback) -->
+        <div class="manual-input-section" id="manual-section">
+            <h3>📋 Atau Paste Link Lokasi Manual</h3>
+            <textarea class="paste-area" id="paste-input"
+                placeholder="Paste link Google Maps di sini...&#10;Contoh: https://maps.google.com/?q=-3.32,114.59"></textarea>
+            <button class="btn-parse" onclick="parseManualInput()">🔍 Proses Lokasi</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script src="js/firebase-config.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/map-utils.js"></script>
+
+    <script>
+        // ---- State ----
+        let map = null;
+        let marker = null;
+        let parsedLat = null;
+        let parsedLng = null;
+        let selectedDriverPhone = null;
+        let selectedDriverName = null;
+        let drivers = [];
+
+        // ---- Init ----
+        document.addEventListener('DOMContentLoaded', () => {
+            if (isFirebaseConfigured()) {
+                initFirebase();
+                Auth.init();
+            }
+
+            initMap();
+            parseShareParams();
+            loadDrivers();
+        });
+
+        function initMap() {
+            map = L.map('share-map', {
+                center: APP_CONFIG.MAP_DEFAULT_CENTER,
+                zoom: APP_CONFIG.MAP_DEFAULT_ZOOM,
+                zoomControl: false
+            });
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19,
+                attribution: '© OSM'
+            }).addTo(map);
+
+            // Allow clicking map to set location
+            map.on('click', (e) => {
+                setLocation(e.latlng.lat, e.latlng.lng, '');
+                // Reverse geocode
+                fetch(`https://nominatim.openstreetmap.org/reverse?lat=${e.latlng.lat}&lon=${e.latlng.lng}&format=json`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.display_name) {
+                            document.getElementById('location-name').value = data.display_name.split(',').slice(0, 3).join(',');
+                        }
+                    }).catch(() => { });
+            });
+        }
+
+        // ---- Parse Share Target params ----
+        function parseShareParams() {
+            const params = new URLSearchParams(window.location.search);
+            const text = params.get('text') || '';
+            const url = params.get('url') || '';
+            const title = params.get('title') || '';
+
+            // Combine all possible sources
+            const combined = `${title} ${text} ${url}`;
+
+            if (combined.trim().length <= 1) {
+                setStatus('info', '📍 Pilih lokasi di peta atau paste link Google Maps di bawah');
+                return;
+            }
+
+            const coords = extractCoordinates(combined);
+            if (coords) {
+                setLocation(coords.lat, coords.lng, title || '');
+                setStatus('success', '✅ Lokasi berhasil diproses!');
+
+                // Try to get address name
+                if (!title) {
+                    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${coords.lat}&lon=${coords.lng}&format=json`)
+                        .then(r => r.json())
+                        .then(data => {
+                            if (data.display_name) {
+                                document.getElementById('location-name').value = data.display_name.split(',').slice(0, 3).join(',');
+                            }
+                        }).catch(() => { });
+                } else {
+                    document.getElementById('location-name').value = title;
+                }
+            } else {
+                setStatus('error', '❌ Tidak bisa menemukan koordinat dari link yang di-share. Coba paste manual di bawah.');
+            }
+        }
+
+        // ---- Extract Coordinates from various URL formats ----
+        function extractCoordinates(text) {
+            // Pattern 1: Explicit lat,lng pairs (e.g., -3.3167,114.5900)
+            const coordPattern = /(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/g;
+
+            // Pattern 2: Google Maps URL formats
+            const patterns = [
+                // maps.google.com/?q=LAT,LNG
+                /[?&]q=(-?\d+\.?\d*)[,%20\s]+(-?\d+\.?\d*)/,
+                // maps.google.com/@LAT,LNG
+                /@(-?\d+\.?\d*),(-?\d+\.?\d*)/,
+                // google.com/maps/place/.../@LAT,LNG
+                /place\/[^/]*\/@(-?\d+\.?\d*),(-?\d+\.?\d*)/,
+                // maps.app.goo.gl or shortened - look for coordinates in text
+                /(-?\d{1,3}\.\d{3,8})[,\s]+(\d{1,3}\.\d{3,8})/,
+                // Decimal degrees: -3.3167 114.5900
+                /(-?\d+\.\d+)\s+(-?\d+\.\d+)/,
+            ];
+
+            for (const pattern of patterns) {
+                const match = text.match(pattern);
+                if (match) {
+                    const lat = parseFloat(match[1]);
+                    const lng = parseFloat(match[2]);
+                    // Basic validation: lat between -90 and 90, lng between -180 and 180
+                    if (lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180) {
+                        return { lat, lng };
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        // ---- Set Location on Map ----
+        function setLocation(lat, lng, name) {
+            parsedLat = lat;
+            parsedLng = lng;
+
+            // Update map
+            if (marker) map.removeLayer(marker);
+            marker = L.marker([lat, lng], {
+                icon: L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div style="width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#ef4444,#dc2626);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.2rem;box-shadow:0 4px 12px rgba(239,68,68,0.4);border:3px solid #fff;">📍</div>`,
+                    iconSize: [36, 36],
+                    iconAnchor: [18, 18]
+                })
+            }).addTo(map);
+
+            map.setView([lat, lng], 16);
+
+            // Update form
+            document.getElementById('coord-lat').value = lat.toFixed(6);
+            document.getElementById('coord-lng').value = lng.toFixed(6);
+            if (name) document.getElementById('location-name').value = name;
+
+            // Show sections
+            document.getElementById('location-info').style.display = 'block';
+            document.getElementById('action-buttons').style.display = 'flex';
+            document.getElementById('manual-section').style.display = 'none';
+
+            updateSendButton();
+        }
+
+        // ---- Set Status ----
+        function setStatus(type, text) {
+            const bar = document.getElementById('status-bar');
+            const statusText = document.getElementById('status-text');
+            bar.className = 'share-status ' + (type === 'success' ? 'status-success' : type === 'error' ? 'status-error' : 'status-loading');
+            statusText.textContent = text;
+        }
+
+        // ---- Load Drivers from Firebase ----
+        async function loadDrivers() {
+            const list = document.getElementById('driver-list');
+
+            if (!isFirebaseConfigured()) {
+                // Demo drivers
+                drivers = [
+                    { id: 'd1', name: 'Ahmad Rizki', phone: '081234567890' },
+                    { id: 'd2', name: 'Budi Santoso', phone: '081234567891' },
+                    { id: 'd3', name: 'Citra Dewi', phone: '081234567892' },
+                ];
+                renderDriverList();
+                return;
+            }
+
+            try {
+                // Wait for auth
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                const snap = await db.collection('users').where('role', '==', 'driver').get();
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    drivers.push({ id: doc.id, name: data.name, phone: data.phone || '' });
+                });
+                renderDriverList();
+            } catch (error) {
+                console.error('Load drivers error:', error);
+                list.innerHTML = '<p style="color:rgba(255,255,255,0.4); font-size:0.85rem;">Tidak bisa memuat daftar driver</p>';
+            }
+        }
+
+        function renderDriverList() {
+            const list = document.getElementById('driver-list');
+            if (drivers.length === 0) {
+                list.innerHTML = '<p style="color:rgba(255,255,255,0.4); font-size:0.85rem;">Belum ada driver terdaftar</p>';
+                return;
+            }
+
+            list.innerHTML = drivers.map(d => `
+                <div class="driver-select-item" id="driver-${d.id}" onclick="selectDriver('${d.id}', '${d.phone}', '${d.name}')">
+                    <div class="avatar">${d.name.split(' ').map(n => n[0]).join('').substring(0, 2)}</div>
+                    <div>
+                        <div style="font-weight:600; font-size:0.9rem;">${d.name}</div>
+                        <div style="font-size:0.8rem; color:rgba(255,255,255,0.5);">${d.phone || 'No phone'}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function selectDriver(id, phone, name) {
+            // Deselect all
+            document.querySelectorAll('.driver-select-item').forEach(el => el.classList.remove('selected'));
+            // Select this
+            document.getElementById('driver-' + id).classList.add('selected');
+            selectedDriverPhone = phone;
+            selectedDriverName = name;
+            document.getElementById('manual-phone').value = phone;
+            updateSendButton();
+        }
+
+        function updateSendButton() {
+            const phone = document.getElementById('manual-phone').value.trim() || selectedDriverPhone;
+            const btn = document.getElementById('btn-send-wa');
+            btn.disabled = !(parsedLat && parsedLng && phone);
+        }
+
+        // Listen for manual phone input
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('manual-phone').addEventListener('input', function () {
+                selectedDriverPhone = this.value.trim();
+                updateSendButton();
+            });
+        });
+
+        // ---- Generate Driver Link ----
+        function generateDriverLink() {
+            const name = encodeURIComponent(document.getElementById('location-name').value || 'Lokasi Tujuan');
+            return `https://kurir-track.vercel.app/go.html?lat=${parsedLat}&lng=${parsedLng}&name=${name}`;
+        }
+
+        // ---- Send to WhatsApp ----
+        function sendToWhatsApp() {
+            const phone = document.getElementById('manual-phone').value.trim() || selectedDriverPhone;
+            if (!phone || !parsedLat || !parsedLng) return;
+
+            // Format phone number
+            let formattedPhone = phone.replace(/[^0-9]/g, '');
+            if (formattedPhone.startsWith('0')) {
+                formattedPhone = '62' + formattedPhone.substring(1);
+            }
+
+            const locationName = document.getElementById('location-name').value || 'Lokasi Tujuan';
+            const link = generateDriverLink();
+
+            const message = `🚚 *PENGANTARAN BARU*\n\n` +
+                `📍 Tujuan: ${locationName}\n` +
+                `📎 Koordinat: ${parsedLat.toFixed(6)}, ${parsedLng.toFixed(6)}\n\n` +
+                `👇 Klik link ini untuk buka navigasi:\n${link}\n\n` +
+                `_Dikirim via KurirTrack_`;
+
+            const waUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+            window.open(waUrl, '_blank');
+        }
+
+        // ---- Copy Link ----
+        function copyLink() {
+            const link = generateDriverLink();
+            navigator.clipboard.writeText(link).then(() => {
+                const btn = document.querySelector('.btn-copy');
+                btn.innerHTML = '✅ Link Tersalin!';
+                setTimeout(() => { btn.innerHTML = '📋 Copy Link'; }, 2000);
+            }).catch(() => {
+                // Fallback
+                const ta = document.createElement('textarea');
+                ta.value = link;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+
+                const btn = document.querySelector('.btn-copy');
+                btn.innerHTML = '✅ Link Tersalin!';
+                setTimeout(() => { btn.innerHTML = '📋 Copy Link'; }, 2000);
+            });
+        }
+
+        // ---- Open in Google Maps ----
+        function openInGoogleMaps() {
+            if (!parsedLat || !parsedLng) return;
+            window.open(`https://www.google.com/maps?q=${parsedLat},${parsedLng}`, '_blank');
+        }
+
+        // ---- Parse Manual Input ----
+        function parseManualInput() {
+            const input = document.getElementById('paste-input').value.trim();
+            if (!input) return;
+
+            const coords = extractCoordinates(input);
+            if (coords) {
+                setLocation(coords.lat, coords.lng, '');
+                setStatus('success', '✅ Lokasi berhasil diproses dari link!');
+
+                // Reverse geocode
+                fetch(`https://nominatim.openstreetmap.org/reverse?lat=${coords.lat}&lon=${coords.lng}&format=json`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.display_name) {
+                            document.getElementById('location-name').value = data.display_name.split(',').slice(0, 3).join(',');
+                        }
+                    }).catch(() => { });
+            } else {
+                setStatus('error', '❌ Tidak bisa menemukan koordinat dari link ini. Pastikan link berisi koordinat.');
+            }
+        }
+    </script>
+</body>
+
+</html>

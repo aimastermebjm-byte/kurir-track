@@ -240,7 +240,49 @@
 
             // Start watching location silently
             startLocationWatch();
+
+            // Check for deep link params (from go.html or WhatsApp link)
+            checkDeepLink();
         });
+
+        function checkDeepLink() {
+            const params = new URLSearchParams(window.location.search);
+            const lat = parseFloat(params.get('lat'));
+            const lng = parseFloat(params.get('lng'));
+            const name = decodeURIComponent(params.get('name') || '');
+
+            if (!isNaN(lat) && !isNaN(lng)) {
+                // Auto-set dropoff
+                setTimeout(() => {
+                    selectLocation(lat, lng, name || 'Lokasi Tujuan', 'dropoff');
+
+                    // Auto-use current location as pickup
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            async (pos) => {
+                                const pLat = pos.coords.latitude;
+                                const pLng = pos.coords.longitude;
+                                try {
+                                    const pName = await RouteEngine.reverseGeocode(pLat, pLng);
+                                    selectLocation(pLat, pLng, pName, 'pickup');
+                                    // Auto find route
+                                    setTimeout(() => findRoute(), 500);
+                                } catch (e) {
+                                    selectLocation(pLat, pLng, 'Lokasi Saya', 'pickup');
+                                    setTimeout(() => findRoute(), 500);
+                                }
+                            },
+                            () => {
+                                showToast('📍 Aktifkan GPS untuk auto-set titik jemput', 'info');
+                            },
+                            { enableHighAccuracy: true }
+                        );
+                    }
+
+                    showToast('📍 Tujuan pengantaran diterima!', 'success');
+                }, 800);
+            }
+        }
 
         function initDriverMap() {
             map = MapUtils.createMap('driver-map', {

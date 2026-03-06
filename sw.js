@@ -1,8 +1,10 @@
 // KurirTrack Service Worker
-const CACHE_NAME = 'kurirtrack-v1';
+const CACHE_NAME = 'kurirtrack-v2';
 const ASSETS = [
     '/',
     '/index.html',
+    '/share.html',
+    '/go.html',
     '/css/global.css',
     '/css/owner.css',
     '/css/driver.css',
@@ -35,6 +37,12 @@ self.addEventListener('activate', (event) => {
 
 // Fetch - Network first, fallback to cache
 self.addEventListener('fetch', (event) => {
+    // Don't cache share target requests (they have query params)
+    if (event.request.url.includes('share.html?') || event.request.url.includes('go.html?')) {
+        event.respondWith(fetch(event.request).catch(() => caches.match(event.request.url.split('?')[0])));
+        return;
+    }
+
     event.respondWith(
         fetch(event.request)
             .then((response) => {

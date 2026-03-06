@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="KurirTrack - Navigasi ke Lokasi">
+    <meta name="theme-color" content="#22c55e">
+    <title>KurirTrack - Navigasi</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="css/global.css">
+    <style>
+        .go-container {
+            min-height: 100vh;
+            background: var(--bg-primary, #0f1117);
+            color: #fff;
+            font-family: 'Inter', -apple-system, sans-serif;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .go-header {
+            padding: 16px 20px;
+            background: var(--bg-card, #1a1d28);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            text-align: center;
+        }
+
+        .go-header h2 {
+            font-size: 1.1rem;
+            margin: 0 0 4px;
+        }
+
+        .go-header p {
+            margin: 0;
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .go-map {
+            flex: 1;
+            min-height: 320px;
+        }
+
+        .go-info {
+            padding: 20px;
+            background: var(--bg-card, #1a1d28);
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .go-destination {
+            display: flex;
+            align-items: flex-start;
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+
+        .go-destination .pin {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+        }
+
+        .go-destination .details h3 {
+            margin: 0 0 4px;
+            font-size: 1rem;
+        }
+
+        .go-destination .details p {
+            margin: 0;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.5);
+            font-family: monospace;
+        }
+
+        .go-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn-navigate-go {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            color: #fff;
+            font-size: 1.05rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .btn-navigate-go:active {
+            transform: scale(0.97);
+        }
+
+        .btn-alt {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            padding: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 14px;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .go-error {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .go-error .icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+
+        .go-error h2 {
+            margin: 0 0 8px;
+        }
+
+        .go-error p {
+            color: rgba(255, 255, 255, 0.5);
+            margin: 0;
+        }
+
+        .badge-from {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: rgba(78, 124, 255, 0.12);
+            color: #4e7cff;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="go-container">
+        <!-- Header -->
+        <div class="go-header">
+            <h2>🚚 Pengantaran Baru</h2>
+            <p>Dari KurirTrack</p>
+            <div class="badge-from">📍 Lokasi tujuan diterima</div>
+        </div>
+
+        <!-- Map -->
+        <div class="go-map" id="go-map"></div>
+
+        <!-- Destination Info -->
+        <div class="go-info" id="go-info" style="display:none;">
+            <div class="go-destination">
+                <div class="pin">📍</div>
+                <div class="details">
+                    <h3 id="dest-name">Lokasi Tujuan</h3>
+                    <p id="dest-coords"></p>
+                </div>
+            </div>
+
+            <div class="go-actions">
+                <button class="btn-navigate-go" onclick="openInKurirTrack()">
+                    🧭 Buka Navigasi KurirTrack
+                </button>
+                <button class="btn-alt" onclick="openInGoogleMaps()">
+                    🗺️ Buka di Google Maps
+                </button>
+            </div>
+        </div>
+
+        <!-- Error State -->
+        <div class="go-error" id="go-error" style="display:none;">
+            <div class="icon">❓</div>
+            <h2>Lokasi Tidak Ditemukan</h2>
+            <p>Link tidak mengandung koordinat yang valid</p>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="js/firebase-config.js"></script>
+
+    <script>
+        let targetLat = null;
+        let targetLng = null;
+        let targetName = '';
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            targetLat = parseFloat(params.get('lat'));
+            targetLng = parseFloat(params.get('lng'));
+            targetName = decodeURIComponent(params.get('name') || 'Lokasi Tujuan');
+
+            if (isNaN(targetLat) || isNaN(targetLng)) {
+                document.getElementById('go-error').style.display = 'block';
+                // Still show map with default center
+                const map = L.map('go-map', {
+                    center: APP_CONFIG.MAP_DEFAULT_CENTER,
+                    zoom: APP_CONFIG.MAP_DEFAULT_ZOOM,
+                    zoomControl: false
+                });
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                    maxZoom: 19, attribution: '© OSM'
+                }).addTo(map);
+                return;
+            }
+
+            // Show location
+            document.getElementById('go-info').style.display = 'block';
+            document.getElementById('dest-name').textContent = targetName;
+            document.getElementById('dest-coords').textContent = `${targetLat.toFixed(6)}, ${targetLng.toFixed(6)}`;
+
+            // Init map
+            const map = L.map('go-map', {
+                center: [targetLat, targetLng],
+                zoom: 16,
+                zoomControl: false
+            });
+
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19, attribution: '© OSM'
+            }).addTo(map);
+
+            // Add marker
+            L.marker([targetLat, targetLng], {
+                icon: L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#ef4444,#dc2626);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.3rem;box-shadow:0 4px 16px rgba(239,68,68,0.5);border:3px solid #fff;">📍</div>`,
+                    iconSize: [40, 40],
+                    iconAnchor: [20, 20]
+                })
+            }).addTo(map);
+
+            // Add pulsing effect
+            L.circleMarker([targetLat, targetLng], {
+                radius: 30,
+                color: '#ef4444',
+                fillColor: '#ef4444',
+                fillOpacity: 0.1,
+                weight: 1
+            }).addTo(map);
+        });
+
+        function openInKurirTrack() {
+            window.location.href = `/driver/main.html?lat=${targetLat}&lng=${targetLng}&name=${encodeURIComponent(targetName)}`;
+        }
+
+        function openInGoogleMaps() {
+            window.open(`https://www.google.com/maps/dir/?api=1&destination=${targetLat},${targetLng}&travelmode=driving`, '_blank');
+        }
+    </script>
+</body>
+
+</html>
