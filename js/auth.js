@@ -168,6 +168,46 @@ const Auth = {
         }
     },
 
+    // ---- Login with Google ----
+    async loginWithGoogle(role) {
+        if (!isFirebaseConfigured()) {
+            console.warn('Firebase not configured');
+            return { success: false, error: 'Firebase belum dikonfigurasi' };
+        }
+
+        try {
+            this.showLoading(true);
+            const provider = new firebase.auth.GoogleAuthProvider();
+            const result = await auth.signInWithPopup(provider);
+            const user = result.user;
+
+            // Check if profile exists
+            const doc = await db.collection('users').doc(user.uid).get();
+            if (!doc.exists) {
+                // First time Google login - create profile
+                const selectedRole = role || 'owner';
+                await db.collection('users').doc(user.uid).set({
+                    name: user.displayName || 'User',
+                    email: user.email,
+                    role: selectedRole,
+                    phone: user.phoneNumber || '',
+                    photoURL: user.photoURL || '',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+
+            await this.loadProfile(user.uid);
+            return { success: true, user: user };
+        } catch (error) {
+            if (error.code === 'auth/popup-closed-by-user') {
+                return { success: false, error: 'Login dibatalkan' };
+            }
+            return { success: false, error: this.getErrorMessage(error.code) };
+        } finally {
+            this.showLoading(false);
+        }
+    },
+
     // ---- Demo Login (tanpa Firebase) ----
     demoLogin(role) {
         this.userProfile = {

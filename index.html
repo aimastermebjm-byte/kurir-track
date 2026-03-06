@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -26,24 +27,37 @@
     .login-page::before {
       content: '';
       position: absolute;
-      width: 300px; height: 300px;
+      width: 300px;
+      height: 300px;
       background: radial-gradient(circle, rgba(78, 124, 255, 0.15), transparent 70%);
-      top: -100px; right: -100px;
+      top: -100px;
+      right: -100px;
       border-radius: 50%;
       animation: float 6s ease-in-out infinite;
     }
+
     .login-page::after {
       content: '';
       position: absolute;
-      width: 250px; height: 250px;
+      width: 250px;
+      height: 250px;
       background: radial-gradient(circle, rgba(34, 197, 94, 0.1), transparent 70%);
-      bottom: -80px; left: -80px;
+      bottom: -80px;
+      left: -80px;
       border-radius: 50%;
       animation: float 8s ease-in-out infinite reverse;
     }
+
     @keyframes float {
-      0%, 100% { transform: translate(0, 0); }
-      50% { transform: translate(20px, -20px); }
+
+      0%,
+      100% {
+        transform: translate(0, 0);
+      }
+
+      50% {
+        transform: translate(20px, -20px);
+      }
     }
 
     .login-brand {
@@ -54,18 +68,31 @@
     }
 
     .login-logo {
-      width: 72px; height: 72px;
+      width: 72px;
+      height: 72px;
       background: var(--gradient-blue);
       border-radius: var(--radius-lg);
-      display: flex; align-items: center; justify-content: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       margin: 0 auto var(--space-md);
-      font-size: 1.75rem; font-weight: 800; color: white;
+      font-size: 1.75rem;
+      font-weight: 800;
+      color: white;
       box-shadow: var(--shadow-glow-blue);
       animation: logoFloat 3s ease-in-out infinite;
     }
+
     @keyframes logoFloat {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-5px); }
+
+      0%,
+      100% {
+        transform: translateY(0);
+      }
+
+      50% {
+        transform: translateY(-5px);
+      }
     }
 
     .login-brand h1 {
@@ -128,6 +155,7 @@
     .register-fields {
       display: none;
     }
+
     .register-fields.show {
       display: contents;
     }
@@ -208,8 +236,121 @@
       border-color: var(--accent-blue);
       color: var(--accent-blue-light);
     }
+
+    .login-divider {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      margin: var(--space-md) 0;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+
+    .login-divider::before,
+    .login-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border-color);
+    }
+
+    .btn-google {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 12px;
+      background: #fff;
+      color: #333;
+      border: 1px solid #ddd;
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .btn-google:hover {
+      background: #f5f5f5;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .btn-google img {
+      width: 20px;
+      height: 20px;
+    }
+
+    /* Role modal for Google login */
+    .role-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-lg);
+    }
+
+    .role-modal.show {
+      display: flex;
+    }
+
+    .role-modal-content {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: var(--space-xl);
+      max-width: 320px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .role-modal-content h3 {
+      margin-bottom: var(--space-md);
+      color: var(--text-primary);
+    }
+
+    .role-modal-content p {
+      color: var(--text-secondary);
+      font-size: 0.8125rem;
+      margin-bottom: var(--space-lg);
+    }
+
+    .role-modal-buttons {
+      display: flex;
+      gap: var(--space-sm);
+    }
+
+    .role-modal-btn {
+      flex: 1;
+      padding: 14px;
+      border: 2px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      background: transparent;
+      color: var(--text-primary);
+    }
+
+    .role-modal-btn:hover {
+      border-color: var(--accent-blue);
+      background: rgba(78, 124, 255, 0.1);
+    }
+
+    .role-modal-btn .role-icon {
+      font-size: 2rem;
+    }
+
+    .role-modal-btn .role-label {
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-top: 4px;
+    }
   </style>
 </head>
+
 <body>
   <div class="login-page">
     <div class="login-brand">
@@ -265,6 +406,13 @@
 
         <button type="submit" class="btn btn-primary btn-full btn-lg" id="auth-submit-btn" data-original-text="Masuk">
           Masuk
+        </button>
+
+        <div class="login-divider">atau</div>
+
+        <button type="button" class="btn-google" onclick="handleGoogleLogin()">
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google">
+          Masuk dengan Google
         </button>
       </form>
     </div>
@@ -359,6 +507,49 @@
     function demoLogin(role) {
       Auth.demoLogin(role);
     }
+
+    async function handleGoogleLogin() {
+      hideError();
+
+      if (currentTab === 'register') {
+        // Show role selector modal for registration
+        document.getElementById('role-modal').classList.add('show');
+        return;
+      }
+
+      // Direct login - role is already in Firestore
+      const result = await Auth.loginWithGoogle();
+      if (!result.success) {
+        showError(result.error);
+      }
+    }
+
+    async function googleLoginWithRole(role) {
+      document.getElementById('role-modal').classList.remove('show');
+      const result = await Auth.loginWithGoogle(role);
+      if (!result.success) {
+        showError(result.error);
+      }
+    }
   </script>
+
+  <!-- Role Selection Modal (for first-time Google login) -->
+  <div class="role-modal" id="role-modal">
+    <div class="role-modal-content">
+      <h3>Pilih Role Anda</h3>
+      <p>Daftar sebagai apa?</p>
+      <div class="role-modal-buttons">
+        <button class="role-modal-btn" onclick="googleLoginWithRole('owner')">
+          <div class="role-icon">👔</div>
+          <div class="role-label">Owner</div>
+        </button>
+        <button class="role-modal-btn" onclick="googleLoginWithRole('driver')">
+          <div class="role-icon">🏍️</div>
+          <div class="role-label">Driver</div>
+        </button>
+      </div>
+    </div>
+  </div>
 </body>
+
 </html>
